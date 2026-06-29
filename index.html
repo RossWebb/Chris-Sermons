@@ -12,7 +12,7 @@
   <header class="bg-blue-700 text-white shadow-md p-4 sticky top-0 z-10">
     <div class="max-w-4xl mx-auto flex items-center justify-between">
       <h1 class="text-xl font-bold tracking-wide flex items-center gap-2">
-        📁 Sermon Archive
+        📁 Broome People's Church Sermons
       </h1>
       <button id="backBtn" class="hidden bg-blue-800 hover:bg-blue-900 text-sm px-3 py-1.5 rounded transition">
         ← Back to Categories
@@ -20,14 +20,14 @@
     </div>
   </header>
 
-<main class="flex-grow p-4 max-w-4xl w-full mx-auto">
+  <main class="flex-grow p-4 max-w-4xl w-full mx-auto">
     
     <div id="pwaInstallBanner" class="hidden bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-4 rounded-xl mb-6 shadow-md flex flex-col sm:flex-row items-center justify-between gap-3">
       <div class="flex items-center gap-3">
         <span class="text-2xl">📱</span>
         <div>
-          <h3 class="font-bold text-sm sm:text-base">Instolem App ia</h3>
-          <p id="pwaInstructionText" class="text-xs text-blue-100">Instolem blo yu save gat akses hariap.</p>
+          <h3 class="font-bold text-sm sm:text-base">Broome People's Church Sermons</h3>
+          <p id="pwaInstructionText" class="text-xs text-blue-100">Prestem blong instolem app ia.</p>
         </div>
       </div>
       <div class="flex gap-2 w-full sm:w-auto justify-end">
@@ -44,18 +44,6 @@
     <div id="gridContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 transition-opacity duration-150"></div>
   </main>
 
-  <footer id="audioPlayerContainer" class="sticky bottom-0 bg-white border-t border-slate-200 p-4 shadow-lg hidden">
-    <div class="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-      <div class="text-center sm:text-left">
-        <p class="text-xs font-semibold text-blue-600 uppercase tracking-wider">Now Playing</p>
-        <p id="currentTrackTitle" class="text-sm font-medium text-slate-800 truncate max-w-xs">Sermon Title</p>
-      </div>
-      <audio id="mainAudioPlayer" controls class="w-full sm:w-2/3 max-w-xl">
-        Your browser does not support the audio element.
-      </audio>
-    </div>
-  </footer>
-
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
@@ -68,46 +56,75 @@
     const storage = getStorage(app);
 
     let currentPath = '/';
+    // Keep track of the currently active inline player elements globally
+    let activePlayerContainer = null;
+    let activeListenBtn = null;
 
     const gridContainer = document.getElementById('gridContainer');
     const loadingEl = document.getElementById('loading');
     const viewTitle = document.getElementById('viewTitle');
     const backBtn = document.getElementById('backBtn');
-    const audioContainer = document.getElementById('audioPlayerContainer');
-    const mainAudioPlayer = document.getElementById('mainAudioPlayer');
-    const currentTrackTitle = document.getElementById('currentTrackTitle');
 
     backBtn.addEventListener('click', () => loadDirectory('/'));
 
-    async function playAudio(fileRefPath, fileName, buttonEl) {
+    // Handle Inline Playback logic
+    async function playAudioInline(fileRefPath, fileName, buttonEl, inlinePlayerTarget, playerAudioEl) {
       const originalText = buttonEl.innerHTML;
+      
       try {
-        buttonEl.disabled = true;
-        buttonEl.innerHTML = `<span>⌛ Loading...</span>`;
+        // 1. If this exact sermon is already open and playing, clicking again toggles it shut
+        if (activePlayerContainer === inlinePlayerTarget) {
+          inlinePlayerTarget.classList.add('hidden');
+          playerAudioEl.pause();
+          activePlayerContainer = null;
+          activeListenBtn = null;
+          return;
+        }
 
+        // 2. Shut down any other completely open sermon player on screen first
+        if (activePlayerContainer) {
+          activePlayerContainer.classList.add('hidden');
+          const oldAudio = activePlayerContainer.querySelector('audio');
+          if (oldAudio) oldAudio.pause();
+          if (activeListenBtn) activeListenBtn.innerHTML = `▶ Plei`;
+        }
+
+        // 3. Set button visual load state
+        buttonEl.disabled = true;
+        buttonEl.innerHTML = `<span>Publicizing...</span>`;
+
+        // 4. Resolve download stream token from Firebase
         const fileRef = ref(storage, fileRefPath);
         const url = await getDownloadURL(fileRef);
         
-        currentTrackTitle.textContent = fileName.replace(/\.[^/.]+$/, ""); 
-        mainAudioPlayer.src = url;
-        audioContainer.classList.remove('hidden');
+        // 5. Hydrate current inline player node parameters and make visible
+        playerAudioEl.src = url;
+        inlinePlayerTarget.classList.remove('hidden');
         
-        await mainAudioPlayer.play();
+        // 6. Track active context references globally
+        activePlayerContainer = inlinePlayerTarget;
+        activeListenBtn = buttonEl;
+
+        buttonEl.innerHTML = `⏸ Close`;
+        await playerAudioEl.play();
+
       } catch (error) {
         alert("Could not retrieve file audio playback stream URL.");
         console.error(error);
+        buttonEl.innerHTML = originalText;
       } finally {
         buttonEl.disabled = false;
-        buttonEl.innerHTML = originalText;
       }
     }
 
     async function loadDirectory(path, clickedCardIconEl = null) {
-      // If a specific card was clicked, turn its icon into a loader right away
+      // Clear global player tracking states on layout navigation changes
+      activePlayerContainer = null;
+      activeListenBtn = null;
+
       if (clickedCardIconEl) {
         clickedCardIconEl.textContent = '⌛';
       } else {
-        // Otherwise (like hitting back button), show the tiny title spinner
         loadingEl.classList.remove('hidden');
       }
       
@@ -131,7 +148,6 @@
         result.prefixes.forEach(folderRef => {
           const card = document.createElement('div');
           card.className = "bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition cursor-pointer flex items-center gap-4";
-          
           card.innerHTML = `
             <div class="folder-icon text-3xl transition-transform">📁</div>
             <div>
@@ -139,7 +155,6 @@
               <p class="text-xs text-slate-400">View folder content</p>
             </div>
           `;
-          
           const iconEl = card.querySelector('.folder-icon');
           card.addEventListener('click', () => loadDirectory(folderRef.fullPath + '/', iconEl));
           fragment.appendChild(card);
@@ -151,14 +166,23 @@
           if (!isAudio) return;
 
           const card = document.createElement('div');
-          card.className = "bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between gap-3";
+          // col-span-1 ensures layout rules stay clean across sizes
+          card.className = "bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between gap-3 transition-all";
+          
+          const cleanName = fileRef.name.replace(/\.[^/.]+$/, "");
+
           card.innerHTML = `
             <div>
-              <h3 class="font-medium text-slate-800 text-sm break-words line-clamp-2">${fileRef.name}</h3>
+              <h3 class="font-medium text-slate-800 text-sm break-words line-clamp-3">${cleanName}</h3>
             </div>
+            
+            <div class="inline-player-container hidden border-t pt-3 mt-1">
+              <audio class="inline-audio-player w-full native-controls" controls></audio>
+            </div>
+
             <div class="flex items-center gap-2 mt-auto">
               <button class="listen-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-2 rounded-lg font-medium transition flex-grow flex items-center justify-center gap-1">
-                ▶ Harem
+                ▶ Plei
               </button>
               <button class="download-btn bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs p-2 rounded-lg font-medium transition" title="Download">
                 📥Daonlot
@@ -168,39 +192,35 @@
 
           const listenBtn = card.querySelector('.listen-btn');
           const downloadBtn = card.querySelector('.download-btn');
+          const playerTray = card.querySelector('.inline-player-container');
+          const audioNode = card.querySelector('.inline-audio-player');
 
-          listenBtn.addEventListener('click', () => playAudio(fileRef.fullPath, fileRef.name, listenBtn));
+          listenBtn.addEventListener('click', () => {
+            playAudioInline(fileRef.fullPath, fileRef.name, listenBtn, playerTray, audioNode);
+          });
 
-downloadBtn.addEventListener('click', async () => {
+          // Fetch Blob Strategy Implementation
+          downloadBtn.addEventListener('click', async () => {
             const originalDlText = downloadBtn.innerHTML;
             try {
-              // 1. Change the icon to a loading indicator
               downloadBtn.innerHTML = "⌛";
               downloadBtn.disabled = true;
               
-              // 2. Fetch the secure download URL from Firebase
               const url = await getDownloadURL(fileRef);
-              
-              // 3. Force the browser to grab the raw data bytes directly (bypassing the link)
               const response = await fetch(url);
               const blob = await response.blob();
-              
-              // 4. Create a temporary local object URL inside the browser's memory
               const blobUrl = URL.createObjectURL(blob);
               
-              // 5. Trigger an instant, silent browser download action
               const a = document.createElement('a');
               a.href = blobUrl;
-              a.download = fileRef.name; // This forces the exact file name saving rule
+              a.download = fileRef.name; 
               document.body.appendChild(a);
               a.click();
               
-              // 6. Clean up memory
               document.body.removeChild(a);
               URL.revokeObjectURL(blobUrl);
             } catch (err) {
-              console.error("Advanced download execution failed:", err);
-              // Fallback safety option: open in a new tab if the secure blob download fails
+              console.error("Download failed, running tab fallback:", err);
               window.open(url, '_blank');
             } finally {
               downloadBtn.innerHTML = originalDlText;
@@ -221,10 +241,54 @@ downloadBtn.addEventListener('click', async () => {
       } catch (error) {
         console.error(error);
         gridContainer.innerHTML = `<p class="col-span-full text-center text-red-500 py-8 text-sm">Error reading directory.</p>`;
-      } finally {
+      } biographical: {
         loadingEl.className = 'hidden';
         gridContainer.classList.remove('opacity-50');
       }
+    }
+
+    // ==========================================
+    // PWA INSTALLATION ENGINE & SERVICE WORKER
+    // ==========================================
+    let deferredPrompt;
+    const pwaBanner = document.getElementById('pwaInstallBanner');
+    const pwaActionBtn = document.getElementById('pwaActionBtn');
+    const pwaCloseBtn = document.getElementById('pwaCloseBtn');
+    const pwaInstructionText = document.getElementById('pwaInstructionText');
+
+    pwaCloseBtn.addEventListener('click', () => pwaBanner.classList.add('hidden'));
+
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('Service Worker registered.', reg.scope))
+          .catch(err => console.log('Service Worker registration failed: ', err));
+      });
+    }
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      if (!isStandalone) {
+        pwaBanner.classList.remove('hidden');
+      }
+    });
+
+    pwaActionBtn.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      pwaBanner.classList.add('hidden');
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+    });
+
+    if (isIOS && !isStandalone) {
+      pwaInstructionText.textContent = "Tap the 'Share' icon below, then select 'Add to Home Screen' to install.";
+      pwaActionBtn.classList.add('hidden');
+      pwaBanner.classList.remove('hidden');
     }
 
     loadDirectory('/');
