@@ -161,7 +161,7 @@
                 ▶ Harem
               </button>
               <button class="download-btn bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs p-2 rounded-lg font-medium transition" title="Download">
-                📥Daonlotem
+                📥Daonlot
               </button>
             </div>
           `;
@@ -171,22 +171,40 @@
 
           listenBtn.addEventListener('click', () => playAudio(fileRef.fullPath, fileRef.name, listenBtn));
 
-          downloadBtn.addEventListener('click', async () => {
+downloadBtn.addEventListener('click', async () => {
             const originalDlText = downloadBtn.innerHTML;
             try {
+              // 1. Change the icon to a loading indicator
               downloadBtn.innerHTML = "⌛";
+              downloadBtn.disabled = true;
+              
+              // 2. Fetch the secure download URL from Firebase
               const url = await getDownloadURL(fileRef);
+              
+              // 3. Force the browser to grab the raw data bytes directly (bypassing the link)
+              const response = await fetch(url);
+              const blob = await response.blob();
+              
+              // 4. Create a temporary local object URL inside the browser's memory
+              const blobUrl = URL.createObjectURL(blob);
+              
+              // 5. Trigger an instant, silent browser download action
               const a = document.createElement('a');
-              a.href = url;
-              a.target = '_blank';
-              a.download = fileRef.name; 
+              a.href = blobUrl;
+              a.download = fileRef.name; // This forces the exact file name saving rule
               document.body.appendChild(a);
               a.click();
+              
+              // 6. Clean up memory
               document.body.removeChild(a);
+              URL.revokeObjectURL(blobUrl);
             } catch (err) {
-              console.error(err);
+              console.error("Advanced download execution failed:", err);
+              // Fallback safety option: open in a new tab if the secure blob download fails
+              window.open(url, '_blank');
             } finally {
               downloadBtn.innerHTML = originalDlText;
+              downloadBtn.disabled = false;
             }
           });
 
