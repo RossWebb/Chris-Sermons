@@ -65,7 +65,7 @@
     </div>
   </footer>
 
-  <script type="module">
+<script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
@@ -77,7 +77,6 @@
     const storage = getStorage(app);
 
     let currentPath = '/';
-    // Keep track of the currently active inline player elements globally
     let activePlayerContainer = null;
     let activeListenBtn = null;
 
@@ -93,7 +92,6 @@
       const originalText = buttonEl.innerHTML;
       
       try {
-        // 1. If this exact sermon is already open and playing, clicking again toggles it shut
         if (activePlayerContainer === inlinePlayerTarget) {
           inlinePlayerTarget.classList.add('hidden');
           playerAudioEl.pause();
@@ -102,7 +100,6 @@
           return;
         }
 
-        // 2. Shut down any other completely open sermon player on screen first
         if (activePlayerContainer) {
           activePlayerContainer.classList.add('hidden');
           const oldAudio = activePlayerContainer.querySelector('audio');
@@ -110,19 +107,15 @@
           if (activeListenBtn) activeListenBtn.innerHTML = `▶ Plei`;
         }
 
-        // 3. Set button visual load state
         buttonEl.disabled = true;
-        buttonEl.innerHTML = `<span>Publicizing...</span>`;
+        buttonEl.innerHTML = `<span>Loading...</span>`;
 
-        // 4. Resolve download stream token from Firebase
         const fileRef = ref(storage, fileRefPath);
         const url = await getDownloadURL(fileRef);
         
-        // 5. Hydrate current inline player node parameters and make visible
         playerAudioEl.src = url;
         inlinePlayerTarget.classList.remove('hidden');
         
-        // 6. Track active context references globally
         activePlayerContainer = inlinePlayerTarget;
         activeListenBtn = buttonEl;
 
@@ -139,7 +132,6 @@
     }
 
     async function loadDirectory(path, clickedCardIconEl = null) {
-      // Clear global player tracking states on layout navigation changes
       activePlayerContainer = null;
       activeListenBtn = null;
 
@@ -165,7 +157,6 @@
         const result = await listAll(storageRef);
         const fragment = document.createDocumentFragment();
 
-        // Render Sub-folders
         result.prefixes.forEach(folderRef => {
           const card = document.createElement('div');
           card.className = "bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition cursor-pointer flex items-center gap-4";
@@ -181,32 +172,27 @@
           fragment.appendChild(card);
         });
 
-        // Render Audio Files
         result.items.forEach(async (fileRef) => {
           const isAudio = /\.(mp3|m4a|wav|ogg)$/i.test(fileRef.name);
           if (!isAudio) return;
 
           const card = document.createElement('div');
-          // col-span-1 ensures layout rules stay clean across sizes
           card.className = "bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between gap-3 transition-all";
-          
           const cleanName = fileRef.name.replace(/\.[^/.]+$/, "");
 
           card.innerHTML = `
             <div>
               <h3 class="font-medium text-slate-800 text-sm break-words line-clamp-3">${cleanName}</h3>
             </div>
-            
             <div class="inline-player-container hidden border-t pt-3 mt-1">
               <audio class="inline-audio-player w-full native-controls" controls></audio>
             </div>
-
             <div class="flex items-center gap-2 mt-auto">
               <button class="listen-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-2 rounded-lg font-medium transition flex-grow flex items-center justify-center gap-1">
                 ▶ Plei
               </button>
               <button class="download-btn bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs p-2 rounded-lg font-medium transition" title="Download">
-                📥Daonlot
+                📥 Daonlot
               </button>
             </div>
           `;
@@ -220,7 +206,6 @@
             playAudioInline(fileRef.fullPath, fileRef.name, listenBtn, playerTray, audioNode);
           });
 
-          // Fetch Blob Strategy Implementation
           downloadBtn.addEventListener('click', async () => {
             const originalDlText = downloadBtn.innerHTML;
             try {
@@ -241,7 +226,7 @@
               document.body.removeChild(a);
               URL.revokeObjectURL(blobUrl);
             } catch (err) {
-              console.error("Download failed, running tab fallback:", err);
+              console.error("Download failed:", err);
               window.open(url, '_blank');
             } finally {
               downloadBtn.innerHTML = originalDlText;
@@ -262,15 +247,13 @@
       } catch (error) {
         console.error(error);
         gridContainer.innerHTML = `<p class="col-span-full text-center text-red-500 py-8 text-sm">Error reading directory.</p>`;
-      } biographical: {
-        loadingEl.className = 'hidden';
+      } finally { // Fixed the "biographical:" typo here ✅
+        loadingEl.classList.add('hidden');
         gridContainer.classList.remove('opacity-50');
       }
     }
 
-    // ==========================================
-    // PWA INSTALLATION ENGINE & SERVICE WORKER
-    // ==========================================
+    // PWA Installation Engine
     let deferredPrompt;
     const pwaBanner = document.getElementById('pwaInstallBanner');
     const pwaActionBtn = document.getElementById('pwaActionBtn');
@@ -307,12 +290,47 @@
     });
 
     if (isIOS && !isStandalone) {
-      pwaInstructionText.textContent = "Tap the 'Share' icon below, then select 'Add to Home Screen' to install.";
+      pwaInstructionText.textContent = "Tevem 'Share' ikon daon long sekrin blo yu, alao klikem 'Add to Home Screen' blo instolem app ia.";
       pwaActionBtn.classList.add('hidden');
       pwaBanner.classList.remove('hidden');
     }
 
     loadDirectory('/');
+
+    // Native Sharing Engine Hook (Added back in! ✅)
+    const shareBtn = document.getElementById('shareBtn');
+    const shareBtnText = document.getElementById('shareBtnText');
+
+    shareBtn.addEventListener('click', async () => {
+      const shareData = {
+        title: "Broome People's Church Sermons",
+        text: "Listen to and download categorized sermons from Broome.",
+        url: window.location.href
+      };
+
+      if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+        try {
+          await navigator.share(shareData);
+        } catch (err) {
+          console.log("Share sheet closed:", err);
+        }
+      } else {
+        try {
+          await navigator.clipboard.writeText(window.location.href);
+          shareBtnText.textContent = "Link copied!";
+          shareBtn.classList.remove('bg-slate-100', 'text-blue-700');
+          shareBtn.classList.add('bg-green-100', 'text-green-700');
+          
+          setTimeout(() => {
+            shareBtnText.textContent = "Share";
+            shareBtn.classList.remove('bg-green-100', 'text-green-700');
+            shareBtn.classList.add('bg-slate-100', 'text-blue-700');
+          }, 2000);
+        } catch (clipboardErr) {
+          console.error("Clipboard copy failed:", clipboardErr);
+        }
+      }
+    });
   </script>
 </body>
 </html>
