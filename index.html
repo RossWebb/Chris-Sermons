@@ -22,16 +22,19 @@
 
   <main class="flex-grow p-4 max-w-4xl w-full mx-auto">
     
+<!-- PWA Dynamic Installation Helper Banner -->
     <div id="pwaInstallBanner" class="hidden bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-4 rounded-xl mb-6 shadow-md flex flex-col sm:flex-row items-center justify-between gap-3">
-      <div class="flex items-center gap-3">
-        <span class="text-2xl">📱</span>
+      <!-- Flex row container holds icon and text side-by-side -->
+      <div class="flex items-start gap-3">
+        <span class="text-2xl leading-none pt-0.5">📱</span>
+        <!-- Text container keeps title and subtitle strictly aligned without wrapping under the icon -->
         <div>
-          <h3 class="font-bold text-sm sm:text-base">Broome People's Church Sermons</h3>
-          <p id="pwaInstructionText" class="text-xs text-blue-100">Prestem blong instolem app ia.</p>
+          <h3 class="font-bold text-sm sm:text-base leading-tight">Instolem App ia</h3>
+          <p id="pwaInstructionText" class="text-xs text-blue-100 mt-1">Instolem blo yu save gat akses hariap.</p>
         </div>
       </div>
-      <div class="flex gap-2 w-full sm:w-auto justify-end">
-        <button id="pwaActionBtn" class="bg-white text-blue-700 text-xs font-bold px-4 py-2 rounded-lg hover:bg-blue-50 transition shadow-sm w-full sm:w-auto">Install</button>
+      <div class="flex gap-2 w-full sm:w-auto justify-end items-center">
+        <button id="pwaActionBtn" class="bg-white text-blue-700 text-xs font-bold px-4 py-2 rounded-lg hover:bg-blue-50 transition shadow-sm w-full sm:w-auto">Instolem</button>
         <button id="pwaCloseBtn" class="text-xs text-blue-200 hover:text-white px-2 py-2 transition">Dismiss</button>
       </div>
     </div>
