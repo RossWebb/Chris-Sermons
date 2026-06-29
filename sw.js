@@ -1,8 +1,8 @@
 const CACHE_NAME = 'sermons-pwa-v1.01';
 const ASSETS = [
-  './',
-  './index.html',
-  './manifest.json',
+  '/Chris-Sermons/',
+  '/Chris-Sermons/index.html',
+  '/Chris-Sermons/manifest.json',
   'https://cdn.tailwindcss.com'
 ];
 
