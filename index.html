@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sermon Archive</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="manifest" href="manifest.json">
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+  <header class="bg-blue-700 text-white shadow-md p-4 sticky top-0 z-10">
+    <div class="max-w-4xl mx-auto flex items-center justify-between">
+      <h1 class="text-xl font-bold tracking-wide flex items-center gap-2">
+        📁 Sermon Archive
+      </h1>
+      <button id="backBtn" class="hidden bg-blue-800 hover:bg-blue-900 text-sm px-3 py-1.5 rounded transition">
+        ← Back to Categories
+      </button>
+    </div>
+  </header>
+
+<main class="flex-grow p-4 max-w-4xl w-full mx-auto">
+    
+    <div id="pwaInstallBanner" class="hidden bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-4 rounded-xl mb-6 shadow-md flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">📱</span>
+        <div>
+          <h3 class="font-bold text-sm sm:text-base">Install Sermon Archive App</h3>
+          <p id="pwaInstructionText" class="text-xs text-blue-100">Add to your home screen for quick offline access.</p>
+        </div>
+      </div>
+      <div class="flex gap-2 w-full sm:w-auto justify-end">
+        <button id="pwaActionBtn" class="bg-white text-blue-700 text-xs font-bold px-4 py-2 rounded-lg hover:bg-blue-50 transition shadow-sm w-full sm:w-auto">Install</button>
+        <button id="pwaCloseBtn" class="text-xs text-blue-200 hover:text-white px-2 py-2 transition">Dismiss</button>
+      </div>
+    </div>
+    
+    <div class="flex items-center gap-3 border-b pb-2 mb-6">
+      <h2 id="viewTitle" class="text-2xl font-bold text-slate-700">Categories</h2>
+      <div id="loading" class="hidden animate-spin rounded-full h-5 w-5 border-b-2 border-blue-700"></div>
+    </div>
+
+    <div id="gridContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 transition-opacity duration-150"></div>
+  </main>
+
+  <footer id="audioPlayerContainer" class="sticky bottom-0 bg-white border-t border-slate-200 p-4 shadow-lg hidden">
+    <div class="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="text-center sm:text-left">
+        <p class="text-xs font-semibold text-blue-600 uppercase tracking-wider">Now Playing</p>
+        <p id="currentTrackTitle" class="text-sm font-medium text-slate-800 truncate max-w-xs">Sermon Title</p>
+      </div>
+      <audio id="mainAudioPlayer" controls class="w-full sm:w-2/3 max-w-xl">
+        Your browser does not support the audio element.
+      </audio>
+    </div>
+  </footer>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
+    const firebaseConfig = {
+      storageBucket: "chook-s-sermons.firebasestorage.app"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const storage = getStorage(app);
+
+    let currentPath = '/';
+
+    const gridContainer = document.getElementById('gridContainer');
+    const loadingEl = document.getElementById('loading');
+    const viewTitle = document.getElementById('viewTitle');
+    const backBtn = document.getElementById('backBtn');
+    const audioContainer = document.getElementById('audioPlayerContainer');
+    const mainAudioPlayer = document.getElementById('mainAudioPlayer');
+    const currentTrackTitle = document.getElementById('currentTrackTitle');
+
+    backBtn.addEventListener('click', () => loadDirectory('/'));
+
+    async function playAudio(fileRefPath, fileName, buttonEl) {
+      const originalText = buttonEl.innerHTML;
+      try {
+        buttonEl.disabled = true;
+        buttonEl.innerHTML = `<span>⌛ Loading...</span>`;
+
+        const fileRef = ref(storage, fileRefPath);
+        const url = await getDownloadURL(fileRef);
+        
+        currentTrackTitle.textContent = fileName.replace(/\.[^/.]+$/, ""); 
+        mainAudioPlayer.src = url;
+        audioContainer.classList.remove('hidden');
+        
+        await mainAudioPlayer.play();
+      } catch (error) {
+        alert("Could not retrieve file audio playback stream URL.");
+        console.error(error);
+      } finally {
+        buttonEl.disabled = false;
+        buttonEl.innerHTML = originalText;
+      }
+    }
+
+    async function loadDirectory(path, clickedCardIconEl = null) {
+      // If a specific card was clicked, turn its icon into a loader right away
+      if (clickedCardIconEl) {
+        clickedCardIconEl.textContent = '⌛';
+      } else {
+        // Otherwise (like hitting back button), show the tiny title spinner
+        loadingEl.classList.remove('hidden');
+      }
+      
+      gridContainer.classList.add('opacity-50');
+      currentPath = path;
+
+      if (path === '/') {
+        viewTitle.textContent = "Categories";
+        backBtn.classList.add('hidden');
+      } else {
+        viewTitle.textContent = path.replace(/\/$/, ''); 
+        backBtn.classList.remove('hidden');
+      }
+
+      try {
+        const storageRef = ref(storage, path);
+        const result = await listAll(storageRef);
+        const fragment = document.createDocumentFragment();
+
+        // Render Sub-folders
+        result.prefixes.forEach(folderRef => {
+          const card = document.createElement('div');
+          card.className = "bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition cursor-pointer flex items-center gap-4";
+          
+          card.innerHTML = `
+            <div class="folder-icon text-3xl transition-transform">📁</div>
+            <div>
+              <h3 class="font-semibold text-slate-800 text-lg">${folderRef.name}</h3>
+              <p class="text-xs text-slate-400">View folder content</p>
+            </div>
+          `;
+          
+          const iconEl = card.querySelector('.folder-icon');
+          card.addEventListener('click', () => loadDirectory(folderRef.fullPath + '/', iconEl));
+          fragment.appendChild(card);
+        });
+
+        // Render Audio Files
+        result.items.forEach(async (fileRef) => {
+          const isAudio = /\.(mp3|m4a|wav|ogg)$/i.test(fileRef.name);
+          if (!isAudio) return;
+
+          const card = document.createElement('div');
+          card.className = "bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between gap-3";
+          card.innerHTML = `
+            <div>
+              <h3 class="font-medium text-slate-800 text-sm break-words line-clamp-2">${fileRef.name}</h3>
+            </div>
+            <div class="flex items-center gap-2 mt-auto">
+              <button class="listen-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-2 rounded-lg font-medium transition flex-grow flex items-center justify-center gap-1">
+                ▶ Listen
+              </button>
+              <button class="download-btn bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs p-2 rounded-lg font-medium transition" title="Download">
+                📥
+              </button>
+            </div>
+          `;
+
+          const listenBtn = card.querySelector('.listen-btn');
+          const downloadBtn = card.querySelector('.download-btn');
+
+          listenBtn.addEventListener('click', () => playAudio(fileRef.fullPath, fileRef.name, listenBtn));
+
+          downloadBtn.addEventListener('click', async () => {
+            const originalDlText = downloadBtn.innerHTML;
+            try {
+              downloadBtn.innerHTML = "⌛";
+              const url = await getDownloadURL(fileRef);
+              const a = document.createElement('a');
+              a.href = url;
+              a.target = '_blank';
+              a.download = fileRef.name; 
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+            } catch (err) {
+              console.error(err);
+            } finally {
+              downloadBtn.innerHTML = originalDlText;
+            }
+          });
+
+          fragment.appendChild(card);
+        });
+
+        gridContainer.innerHTML = '';
+        gridContainer.appendChild(fragment);
+
+        if (result.prefixes.length === 0 && result.items.length === 0) {
+          gridContainer.innerHTML = `<p class="col-span-full text-center py-8 text-slate-400 text-sm">This folder is empty.</p>`;
+        }
+
+      } catch (error) {
+        console.error(error);
+        gridContainer.innerHTML = `<p class="col-span-full text-center text-red-500 py-8 text-sm">Error reading directory.</p>`;
+      } finally {
+        loadingEl.className = 'hidden';
+        gridContainer.classList.remove('opacity-50');
+      }
+    }
+
+    loadDirectory('/');
+  </script>
+</body>
+</html>
