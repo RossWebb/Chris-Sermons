@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sermons-pwa-v1.02';
+const CACHE_NAME = 'sermons-pwa-v1.03';
 const ASSETS = [
   '/Chris-Sermons/',
   '/Chris-Sermons/index.html',
