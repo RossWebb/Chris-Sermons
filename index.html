@@ -66,8 +66,9 @@
   </footer>
 
 <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+// Added getMetadata to the line below:
+import { getStorage, ref, listAll, getDownloadURL, getMetadata } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
     const firebaseConfig = {
       storageBucket: "chook-s-sermons.firebasestorage.app"
@@ -182,7 +183,6 @@
           
           const cleanName = fileRef.name.replace(/\.[^/.]+$/, "");
 
-          // 1. Build base skeleton structure
           card.innerHTML = `
             <div>
               <div class="flex items-start gap-2 mb-1">
@@ -209,32 +209,25 @@
           const audioNode = card.querySelector('.inline-audio-player');
           const badgeContainer = card.querySelector('.badge-container');
 
-          // 2. Dynamic Date Check: Fetch metadata from Firebase Cloud Storage
-          try {
-            // Need to import getMetadata at the top if not present:
-            // import { getStorage, ref, listAll, getDownloadURL, getMetadata } from "...";
-            const { getMetadata } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js");
-            const metadata = await getMetadata(fileRef);
-            
+          // Safe, isolated background check for the date metadata
+          getMetadata(fileRef).then((metadata) => {
             const createdDate = new Date(metadata.timeCreated);
             const today = new Date();
             const differenceInDays = (today - createdDate) / (1000 * 60 * 60 * 24);
 
-            // If the file is less than 14 days old, show the badge!
+            // Show badge if uploaded within the last 14 days
             if (differenceInDays <= 14) {
               badgeContainer.classList.remove('hidden');
               card.classList.add('border-green-300', 'bg-gradient-to-b', 'from-green-50/30', 'to-white');
             }
-          } catch (metaErr) {
-            console.error("Could not fetch file metadata for badge:", metaErr);
-          }
+          }).catch((metaErr) => {
+            console.log("No metadata badge needed/available for this item.");
+          });
 
-          // Listen button logic
           listenBtn.addEventListener('click', () => {
             playAudioInline(fileRef.fullPath, fileRef.name, listenBtn, playerTray, audioNode);
           });
 
-          // Download button logic
           downloadBtn.addEventListener('click', async () => {
             const originalDlText = downloadBtn.innerHTML;
             try {
