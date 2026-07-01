@@ -172,17 +172,23 @@
           fragment.appendChild(card);
         });
 
+// Render Audio Files with Dynamic "Niu" Badge
         result.items.forEach(async (fileRef) => {
           const isAudio = /\.(mp3|m4a|wav|ogg)$/i.test(fileRef.name);
           if (!isAudio) return;
 
           const card = document.createElement('div');
-          card.className = "bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between gap-3 transition-all";
+          card.className = "bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between gap-3 transition-all relative";
+          
           const cleanName = fileRef.name.replace(/\.[^/.]+$/, "");
 
+          // 1. Build base skeleton structure
           card.innerHTML = `
             <div>
-              <h3 class="font-medium text-slate-800 text-sm break-words line-clamp-3">${cleanName}</h3>
+              <div class="flex items-start gap-2 mb-1">
+                <span class="badge-container hidden bg-green-100 text-green-700 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm shrink-0 uppercase tracking-wider">🟢 Niu</span>
+                <h3 class="font-medium text-slate-800 text-sm break-words line-clamp-3">${cleanName}</h3>
+              </div>
             </div>
             <div class="inline-player-container hidden border-t pt-3 mt-1">
               <audio class="inline-audio-player w-full native-controls" controls></audio>
@@ -196,6 +202,69 @@
               </button>
             </div>
           `;
+
+          const listenBtn = card.querySelector('.listen-btn');
+          const downloadBtn = card.querySelector('.download-btn');
+          const playerTray = card.querySelector('.inline-player-container');
+          const audioNode = card.querySelector('.inline-audio-player');
+          const badgeContainer = card.querySelector('.badge-container');
+
+          // 2. Dynamic Date Check: Fetch metadata from Firebase Cloud Storage
+          try {
+            // Need to import getMetadata at the top if not present:
+            // import { getStorage, ref, listAll, getDownloadURL, getMetadata } from "...";
+            const { getMetadata } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js");
+            const metadata = await getMetadata(fileRef);
+            
+            const createdDate = new Date(metadata.timeCreated);
+            const today = new Date();
+            const differenceInDays = (today - createdDate) / (1000 * 60 * 60 * 24);
+
+            // If the file is less than 14 days old, show the badge!
+            if (differenceInDays <= 14) {
+              badgeContainer.classList.remove('hidden');
+              card.classList.add('border-green-300', 'bg-gradient-to-b', 'from-green-50/30', 'to-white');
+            }
+          } catch (metaErr) {
+            console.error("Could not fetch file metadata for badge:", metaErr);
+          }
+
+          // Listen button logic
+          listenBtn.addEventListener('click', () => {
+            playAudioInline(fileRef.fullPath, fileRef.name, listenBtn, playerTray, audioNode);
+          });
+
+          // Download button logic
+          downloadBtn.addEventListener('click', async () => {
+            const originalDlText = downloadBtn.innerHTML;
+            try {
+              downloadBtn.innerHTML = "⌛";
+              downloadBtn.disabled = true;
+              
+              const url = await getDownloadURL(fileRef);
+              const response = await fetch(url);
+              const blob = await response.blob();
+              const blobUrl = URL.createObjectURL(blob);
+              
+              const a = document.createElement('a');
+              a.href = blobUrl;
+              a.download = fileRef.name; 
+              document.body.appendChild(a);
+              a.click();
+              
+              document.body.removeChild(a);
+              URL.revokeObjectURL(blobUrl);
+            } catch (err) {
+              console.error("Download failed:", err);
+              window.open(url, '_blank');
+            } finally {
+              downloadBtn.innerHTML = originalDlText;
+              downloadBtn.disabled = false;
+            }
+          });
+
+          fragment.appendChild(card);
+        });
 
           const listenBtn = card.querySelector('.listen-btn');
           const downloadBtn = card.querySelector('.download-btn');
