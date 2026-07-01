@@ -150,17 +150,31 @@
         const result = await listAll(storageRef);
         const fragment = document.createDocumentFragment();
 
-        // Render Sub-folders
-        result.prefixes.forEach(folderRef => {
+          // Render Sub-folders with Optional "_new" Badge
+         result.prefixes.forEach(folderRef => {
           const card = document.createElement('div');
-          card.className = "bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition cursor-pointer flex items-center gap-4";
+          
+          // 1. Detect if folder name ends with "_new" and clean it up for display
+          const isNewFolder = folderRef.name.endsWith('_new');
+          const displayFolderName = isNewFolder ? folderRef.name.replace('_new', '') : folderRef.name;
+
+          // 2. Add normal folder styling, plus a subtle green border glow if it's marked new
+          card.className = `bg-white p-5 rounded-xl border shadow-sm hover:shadow-md hover:border-blue-300 transition cursor-pointer flex items-center gap-4 ${
+            isNewFolder ? 'border-green-300 bg-gradient-to-b from-green-50/20 to-white' : 'border-slate-200'
+          }`;
+
+          // 3. Inject clean name and conditionally display the "NIU" sticker
           card.innerHTML = `
             <div class="folder-icon text-3xl transition-transform">📁</div>
             <div>
-              <h3 class="font-semibold text-slate-800 text-lg">${folderRef.name}</h3>
+              <div class="flex items-center gap-2">
+                <h3 class="font-semibold text-slate-800 text-lg">${displayFolderName}</h3>
+                ${isNewFolder ? '<span class="bg-green-100 text-green-700 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm tracking-wider uppercase">Niu</span>' : ''}
+              </div>
               <p class="text-xs text-slate-400">View folder content</p>
             </div>
           `;
+
           const iconEl = card.querySelector('.folder-icon');
           card.addEventListener('click', () => loadDirectory(folderRef.fullPath + '/', iconEl));
           fragment.appendChild(card);
