@@ -58,9 +58,17 @@
     </div>
   </footer>
 
-  <script type="module">
+<script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getStorage, ref, listAll, getDownloadURL, getMetadata } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
+    // ========================================================
+    // APP CONFIGURATION: Add names of folders to mark as "Niu"
+    // ========================================================
+    const NEW_FOLDERS = [
+      "Romans", 
+      "Gospel of Mark"
+    ];
 
     const firebaseConfig = {
       storageBucket: "chook-s-sermons.firebasestorage.app"
@@ -150,25 +158,35 @@
         const result = await listAll(storageRef);
         const fragment = document.createDocumentFragment();
 
-          // Render Sub-folders with Optional "_new" Badge
-         result.prefixes.forEach(folderRef => {
+        // ==========================================
+        // 1. ADD YOUR NEW FOLDER NAMES HERE (At the top of your loadDirectory function or script)
+        // ==========================================
+        const NEW_FOLDERS = [
+          "John", 
+          "Joshua"
+        ];
+
+        // ==========================================
+        // 2. THE UPDATED SUB-FOLDERS LOOP
+        // ==========================================
+        // Render Sub-folders with Optional List-based "Niu" Badge
+        result.prefixes.forEach(folderRef => {
           const card = document.createElement('div');
           
-          // 1. Detect if folder name ends with "_new" and clean it up for display
-          const isNewFolder = folderRef.name.endsWith('_new');
-          const displayFolderName = isNewFolder ? folderRef.name.replace('_new', '') : folderRef.name;
+          // Check if this folder's name is listed inside our NEW_FOLDERS array above
+          const isNewFolder = NEW_FOLDERS.includes(folderRef.name);
 
-          // 2. Add normal folder styling, plus a subtle green border glow if it's marked new
+          // Add normal folder styling, plus a subtle green border glow if it's in our new list
           card.className = `bg-white p-5 rounded-xl border shadow-sm hover:shadow-md hover:border-blue-300 transition cursor-pointer flex items-center gap-4 ${
-            isNewFolder ? 'border-green-300 bg-gradient-to-b from-green-50/20 to-white' : 'border-slate-200'
+            isNewFolder ? 'border-green-300 bg-gradient-to-b from-green-50/30 to-white' : 'border-slate-200'
           }`;
 
-          // 3. Inject clean name and conditionally display the "NIU" sticker
+          // Inject the folder name and conditionally display the "Niu" sticker
           card.innerHTML = `
             <div class="folder-icon text-3xl transition-transform">📁</div>
             <div>
               <div class="flex items-center gap-2">
-                <h3 class="font-semibold text-slate-800 text-lg">${displayFolderName}</h3>
+                <h3 class="font-semibold text-slate-800 text-lg">${folderRef.name}</h3>
                 ${isNewFolder ? '<span class="bg-green-100 text-green-700 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm tracking-wider uppercase">Niu</span>' : ''}
               </div>
               <p class="text-xs text-slate-400">View folder content</p>
