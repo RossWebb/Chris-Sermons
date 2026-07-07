@@ -9,17 +9,22 @@
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
 
-  <header class="bg-blue-700 text-white shadow-md p-4 sticky top-0 z-10">
+<header class="bg-blue-700 text-white shadow-md p-4 sticky top-0 z-10">
     <div class="max-w-4xl mx-auto flex items-start justify-between gap-4">
       
       <h1 class="text-xl font-bold tracking-wide flex items-start gap-2">
         <span class="leading-none pt-0.5">📁</span>
-        <span class="leading-tight">Broome People's Church Sermons</span>
+        <span id="headerTitle" class="leading-tight">Broome People's Church Sermons</span>
       </h1>
       
-      <button id="backBtn" class="hidden bg-blue-800 hover:bg-blue-900 text-sm px-3 py-1.5 rounded transition shrink-0">
-        ← Gobak long ol Topic
-      </button>
+      <div class="flex items-center gap-2 shrink-0">
+        <button id="langToggleBtn" class="bg-blue-800 hover:bg-blue-900 border border-blue-500 text-xs font-semibold px-2.5 py-1.5 rounded transition">
+          🌐 Bislama
+        </button>
+        <button id="backBtn" class="hidden bg-blue-800 hover:bg-blue-900 text-sm px-3 py-1.5 rounded transition">
+          ← Gobak long ol Topic
+        </button>
+      </div>
     </div>
   </header>
 
@@ -63,13 +68,102 @@
     import { getStorage, ref, listAll, getDownloadURL, getMetadata } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
     // ========================================================
-    // APP CONFIGURATION: Add names of folders to mark as "Niu"
+    // 1. APP CONFIGURATION & TRANSLATIONS
     // ========================================================
     const NEW_FOLDERS = [
-      "Romans", 
-      "Gospel of Mark"
+      "John", 
+      "Joshua"
     ];
+	
+    const TRANSLATIONS = {
+      en: {
+        headerTitle: "Broome People's Church Sermons",
+        viewTitleMain: "Topics",
+        viewTitleEmpty: "This folder is empty.",
+        viewTitleError: "Error reading directory.",
+        backBtn: "← Back to Topics",
+        pwaTitle: "Install this App",
+        pwaDesc: "Install for quick and easy access anytime.",
+        pwaBtn: "Install",
+        pwaDismiss: "Dismiss",
+        pwaIOS: "Tap the 'Share' icon below, then select 'Add to Home Screen' to install this app.",
+        folderDesc: "View folder content",
+        btnPlay: "▶ Play",
+        btnClose: "⏸ Close",
+        btnLoading: "<span>Loading...</span>",
+        btnDownload: "📥 Download",
+        errAudio: "Could not retrieve file audio playback stream URL.",
+        errDownload: "Download failed:",
+        shareTitle: "Broome People's Church Sermons",
+        shareText: "Listen to and download categorized sermons from Broome.",
+        shareCopied: "Link copied!",
+        shareDefault: "Share",
+        badgeNew: "New",
+        langBtnText: "🌐 Bislama"
+      },
+      bi: {
+        headerTitle: "Broome People's Church Sermons", 
+        viewTitleMain: "Ol Topik",
+        viewTitleEmpty: "This folder is empty.",
+        viewTitleError: "Error reading directory.",
+        backBtn: "← Gobak long ol Topic",
+        pwaTitle: "Instolem App ia",
+        pwaDesc: "Instolem blo yu save gat akses hariap.",
+        pwaBtn: "Instolem",
+        pwaDismiss: "Dismiss",
+        pwaIOS: "Tevem 'Share' ikon daon long sekrin blo yu, alao klikem 'Add to Home Screen' blo instolem app ia.",
+        folderDesc: "View folder content",
+        btnPlay: "▶ Plei",
+        btnClose: "⏸ Close",
+        btnLoading: "<span>Loading...</span>",
+        btnDownload: "📥 Daonlot",
+        errAudio: "Could not retrieve file audio playback stream URL.",
+        errDownload: "Download failed:",
+        shareTitle: "Broome People's Church Sermons",
+        shareText: "Listen to and download categorized sermons from Broome.",
+        shareCopied: "Link copied!",
+        shareDefault: "Share",
+        badgeNew: "Niu",
+        langBtnText: "🌐 English"
+      }
+    };
 
+    // ========================================================
+    // 2. GLOBAL APP STATE & DEVICE DETECTION
+    // ========================================================
+    const isVanuatuTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone === 'Pacific/Efate';
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    let deferredPrompt;
+
+    let currentLang = localStorage.getItem('appLanguage');
+    if (!currentLang) {
+      currentLang = isVanuatuTimeZone ? 'bi' : 'en';
+    }
+
+    let currentPath = '/';
+    let activePlayerContainer = null;
+    let activeListenBtn = null;
+
+    // ========================================================
+    // 3. HTML DOM ELEMENT SELECTORS
+    // ========================================================
+    const gridContainer = document.getElementById('gridContainer');
+    const loadingEl = document.getElementById('loading');
+    const viewTitle = document.getElementById('viewTitle');
+    const backBtn = document.getElementById('backBtn');
+    const langToggleBtn = document.getElementById('langToggleBtn');
+    const headerTitle = document.getElementById('headerTitle');
+    const pwaBanner = document.getElementById('pwaInstallBanner');
+    const pwaActionBtn = document.getElementById('pwaActionBtn');
+    const pwaCloseBtn = document.getElementById('pwaCloseBtn');
+    const pwaInstructionText = document.getElementById('pwaInstructionText');
+    const shareBtn = document.getElementById('shareBtn');
+    const shareBtnText = document.getElementById('shareBtnText');
+
+    // ========================================================
+    // 4. FIREBASE SETUP
+    // ========================================================
     const firebaseConfig = {
       storageBucket: "chook-s-sermons.firebasestorage.app"
     };
@@ -77,18 +171,39 @@
     const app = initializeApp(firebaseConfig);
     const storage = getStorage(app);
 
-    let currentPath = '/';
-    let activePlayerContainer = null;
-    let activeListenBtn = null;
+    // ========================================================
+    // 5. LANGUAGE TRANSLATION ENGINE
+    // ========================================================
+    function updateInterfaceLanguage() {
+      const t = TRANSLATIONS[currentLang];
+      
+      headerTitle.textContent = t.headerTitle;
+      if (currentPath === '/') {
+        viewTitle.textContent = t.viewTitleMain;
+      }
+      backBtn.textContent = t.backBtn;
+      langToggleBtn.textContent = t.langBtnText;
+      
+      document.querySelector('#pwaInstallBanner h3').textContent = t.pwaTitle;
+      pwaInstructionText.textContent = isIOS ? t.pwaIOS : t.pwaDesc;
+      pwaActionBtn.textContent = t.pwaBtn;
+      pwaCloseBtn.textContent = t.pwaDismiss;
+      shareBtnText.textContent = t.shareDefault;
+    }
 
-    const gridContainer = document.getElementById('gridContainer');
-    const loadingEl = document.getElementById('loading');
-    const viewTitle = document.getElementById('viewTitle');
-    const backBtn = document.getElementById('backBtn');
+    langToggleBtn.addEventListener('click', () => {
+      currentLang = currentLang === 'en' ? 'bi' : 'en';
+      localStorage.setItem('appLanguage', currentLang);
+      updateInterfaceLanguage();
+      loadDirectory(currentPath);
+    });
 
-    backBtn.addEventListener('click', () => loadDirectory('/'));
+    // Run immediately to set initial language
+    updateInterfaceLanguage();
 
-    // Handle Inline Playback logic
+    // ========================================================
+    // 6. INLINE AUDIO PLAYER CORE
+    // ========================================================
     async function playAudioInline(fileRefPath, fileName, buttonEl, inlinePlayerTarget, playerAudioEl) {
       const originalText = buttonEl.innerHTML;
       
@@ -105,11 +220,11 @@
           activePlayerContainer.classList.add('hidden');
           const oldAudio = activePlayerContainer.querySelector('audio');
           if (oldAudio) oldAudio.pause();
-          if (activeListenBtn) activeListenBtn.innerHTML = `▶ Plei`;
+          if (activeListenBtn) activeListenBtn.innerHTML = TRANSLATIONS[currentLang].btnPlay;
         }
 
         buttonEl.disabled = true;
-        buttonEl.innerHTML = `<span>Loading...</span>`;
+        buttonEl.innerHTML = TRANSLATIONS[currentLang].btnLoading;
 
         const fileRef = ref(storage, fileRefPath);
         const url = await getDownloadURL(fileRef);
@@ -120,11 +235,11 @@
         activePlayerContainer = inlinePlayerTarget;
         activeListenBtn = buttonEl;
 
-        buttonEl.innerHTML = `⏸ Close`;
+        buttonEl.innerHTML = TRANSLATIONS[currentLang].btnClose;
         await playerAudioEl.play();
 
       } catch (error) {
-        alert("Could not retrieve file audio playback stream URL.");
+        alert(TRANSLATIONS[currentLang].errAudio);
         console.error(error);
         buttonEl.innerHTML = originalText;
       } finally {
@@ -132,6 +247,9 @@
       }
     }
 
+    // ========================================================
+    // 7. FIREBASE CORE DIRECTORY LOADER
+    // ========================================================
     async function loadDirectory(path, clickedCardIconEl = null) {
       activePlayerContainer = null;
       activeListenBtn = null;
@@ -146,7 +264,7 @@
       currentPath = path;
 
       if (path === '/') {
-        viewTitle.textContent = "Categories";
+        viewTitle.textContent = TRANSLATIONS[currentLang].viewTitleMain;
         backBtn.classList.add('hidden');
       } else {
         viewTitle.textContent = path.replace(/\/$/, ''); 
@@ -158,38 +276,23 @@
         const result = await listAll(storageRef);
         const fragment = document.createDocumentFragment();
 
-        // ==========================================
-        // 1. ADD YOUR NEW FOLDER NAMES HERE (At the top of your loadDirectory function or script)
-        // ==========================================
-        const NEW_FOLDERS = [
-          "John", 
-          "Joshua"
-        ];
-
-        // ==========================================
-        // 2. THE UPDATED SUB-FOLDERS LOOP
-        // ==========================================
         // Render Sub-folders with Optional List-based "Niu" Badge
         result.prefixes.forEach(folderRef => {
           const card = document.createElement('div');
-          
-          // Check if this folder's name is listed inside our NEW_FOLDERS array above
           const isNewFolder = NEW_FOLDERS.includes(folderRef.name);
 
-          // Add normal folder styling, plus a subtle green border glow if it's in our new list
           card.className = `bg-white p-5 rounded-xl border shadow-sm hover:shadow-md hover:border-blue-300 transition cursor-pointer flex items-center gap-4 ${
-            isNewFolder ? 'border-green-300 bg-gradient-to-b from-green-50/30 to-white' : 'border-slate-200'
+            isNewFolder ? 'border-green-300 bg-gradient-to-b from-green-50/20 to-white' : 'border-slate-200'
           }`;
 
-          // Inject the folder name and conditionally display the "Niu" sticker
           card.innerHTML = `
             <div class="folder-icon text-3xl transition-transform">📁</div>
             <div>
               <div class="flex items-center gap-2">
                 <h3 class="font-semibold text-slate-800 text-lg">${folderRef.name}</h3>
-                ${isNewFolder ? '<span class="bg-green-100 text-green-700 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm tracking-wider uppercase">Niu</span>' : ''}
+                ${isNewFolder ? `<span class="bg-green-100 text-green-700 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm tracking-wider uppercase">${TRANSLATIONS[currentLang].badgeNew}</span>` : ''}
               </div>
-              <p class="text-xs text-slate-400">View folder content</p>
+              <p class="text-xs text-slate-400">${TRANSLATIONS[currentLang].folderDesc}</p>
             </div>
           `;
 
@@ -198,7 +301,7 @@
           fragment.appendChild(card);
         });
 
-        // Render Audio Files with Dynamic "Niu" Badge
+        // Render Audio Files with Dynamic "Niu" Metadata Badge
         result.items.forEach(async (fileRef) => {
           const isAudio = /\.(mp3|m4a|wav|ogg)$/i.test(fileRef.name);
           if (!isAudio) return;
@@ -211,7 +314,7 @@
           card.innerHTML = `
             <div>
               <div class="flex items-start gap-2 mb-1">
-                <span class="badge-container hidden bg-green-100 text-green-700 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm shrink-0 uppercase tracking-wider">🟢 Niu</span>
+                <span class="badge-container hidden bg-green-100 text-green-700 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm shrink-0 uppercase tracking-wider">🟢 ${TRANSLATIONS[currentLang].badgeNew}</span>
                 <h3 class="font-medium text-slate-800 text-sm break-words line-clamp-3">${cleanName}</h3>
               </div>
             </div>
@@ -220,10 +323,10 @@
             </div>
             <div class="flex items-center gap-2 mt-auto">
               <button class="listen-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-2 rounded-lg font-medium transition flex-grow flex items-center justify-center gap-1">
-                ▶ Plei
+                ${TRANSLATIONS[currentLang].btnPlay}
               </button>
               <button class="download-btn bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs p-2 rounded-lg font-medium transition" title="Download">
-                📥 Daonlot
+                ${TRANSLATIONS[currentLang].btnDownload}
               </button>
             </div>
           `;
@@ -234,7 +337,6 @@
           const audioNode = card.querySelector('.inline-audio-player');
           const badgeContainer = card.querySelector('.badge-container');
 
-          // Safe background metadata execution
           getMetadata(fileRef).then((metadata) => {
             const createdDate = new Date(metadata.timeCreated);
             const today = new Date();
@@ -287,29 +389,23 @@
         gridContainer.appendChild(fragment);
 
         if (result.prefixes.length === 0 && result.items.length === 0) {
-          gridContainer.innerHTML = `<p class="col-span-full text-center py-8 text-slate-400 text-sm">This folder is empty.</p>`;
+          gridContainer.innerHTML = `<p class="col-span-full text-center py-8 text-slate-400 text-sm">${TRANSLATIONS[currentLang].viewTitleEmpty}</p>`;
         }
 
       } catch (error) {
         console.error(error);
-        gridContainer.innerHTML = `<p class="col-span-full text-center text-red-500 py-8 text-sm">Error reading directory.</p>`;
+        gridContainer.innerHTML = `<p class="col-span-full text-center text-red-500 py-8 text-sm">${TRANSLATIONS[currentLang].viewTitleError}</p>`;
       } finally {
         loadingEl.classList.add('hidden');
         gridContainer.classList.remove('opacity-50');
       }
     }
 
-    // PWA Installation Engine
-    let deferredPrompt;
-    const pwaBanner = document.getElementById('pwaInstallBanner');
-    const pwaActionBtn = document.getElementById('pwaActionBtn');
-    const pwaCloseBtn = document.getElementById('pwaCloseBtn');
-    const pwaInstructionText = document.getElementById('pwaInstructionText');
-
+    // ========================================================
+    // 8. GLOBAL BUTTONS & PWA EVENTS
+    // ========================================================
+    backBtn.addEventListener('click', () => loadDirectory('/'));
     pwaCloseBtn.addEventListener('click', () => pwaBanner.classList.add('hidden'));
-
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -336,21 +432,13 @@
     });
 
     if (isIOS && !isStandalone) {
-      pwaInstructionText.textContent = "Tevem 'Share' ikon daon long sekrin blo yu, alao klikem 'Add to Home Screen' blo instolem app ia.";
-      pwaActionBtn.classList.add('hidden');
       pwaBanner.classList.remove('hidden');
     }
 
-    loadDirectory('/');
-
-    // Native Sharing Engine Hook
-    const shareBtn = document.getElementById('shareBtn');
-    const shareBtnText = document.getElementById('shareBtnText');
-
     shareBtn.addEventListener('click', async () => {
       const shareData = {
-        title: "Broome People's Church Sermons",
-        text: "Listen to and download categorized sermons from Broome.",
+        title: TRANSLATIONS[currentLang].shareTitle,
+        text: TRANSLATIONS[currentLang].shareText,
         url: window.location.href
       };
 
@@ -363,12 +451,12 @@
       } else {
         try {
           await navigator.clipboard.writeText(window.location.href);
-          shareBtnText.textContent = "Link copied!";
+          shareBtnText.textContent = TRANSLATIONS[currentLang].shareCopied;
           shareBtn.classList.remove('bg-slate-100', 'text-blue-700');
           shareBtn.classList.add('bg-green-100', 'text-green-700');
           
           setTimeout(() => {
-            shareBtnText.textContent = "Share";
+            shareBtnText.textContent = TRANSLATIONS[currentLang].shareDefault;
             shareBtn.classList.remove('bg-green-100', 'text-green-700');
             shareBtn.classList.add('bg-slate-100', 'text-blue-700');
           }, 2000);
@@ -377,6 +465,9 @@
         }
       }
     });
+
+    // Initial load call
+    loadDirectory('/');
   </script>
 </body>
 </html>
